@@ -1,109 +1,117 @@
-# Shelly‑2PM PV Pool Control
+# Shelly 2PM Gen3 – PV-gesteuerte Poolpumpe
 
-Automatisierte Steuerung einer Poolpumpe über Photovoltaik‑Überschuss mit **Shelly Pro 2PM** – inklusive Sunrise/Sunset‑Logik, Hysterese, manueller Übersteuerung und Tagesstatistik, optional protokolliert in Google Sheets.
-
----
-
-## Funktions‑Highlights
-
-| Feature | Beschreibung |
-|---------|--------------|
-| PV‑abhängiges Schalten | Die Pumpe läuft nur, wenn die PV‑Leistung längere Zeit oberhalb einer einstellbaren Schwelle liegt (Standard 580 W). |
-| Sunrise/Sunset‑Erkennung | Tagesanfang/‑ende wird live anhand der PV‑Leistung erkannt – kein externer Sonnenaufgangs‑API nötig. |
-| Frühstart & Hysterese | Optionaler Frühstart bei starkem Morning‑Peak (> 400 W) sowie 5‑Minuten‑Ein/Aus‑Hysterese zur Vermeidung von Taktbetrieb. |
-| Maximale Laufzeit | Begrenzung auf 6 h/Tag; Abschaltung auch bei nachlassender PV‑Leistung. |
-| Manuelle Steuerung | Jederzeitiges Ein/Aus über einen an **INPUT 1** angeschlossenen Taster. |
-| Livedaten & Logging | Minütliche Energiewerte (PV, Pumpe, Netzbezug, Überschuss) sowie Ereignis‑Logs per HTTP‑POST an ein Google‑Sheet. |
+**Voll autonom ohne Cloud!**  
+Dieses Shelly-Skript schaltet deine Poolpumpe strikt nach dem Überschuss deiner PV-Anlage.  
+Der gesamte Tagesverlauf (Sunrise / Sunset, Startfenster, max. Laufzeit) wird ausschließlich aus der gemessenen Leistung berechnet – ganz ohne Internet oder externe APIs.  
+Wer trotzdem ein Minütliches Logging in Google Sheets möchte, kann das optionale App Script nutzen; dafür ist dann natürlich Internetzugang erforderlich.
 
 ---
 
-## Hardware‑/Software‑Voraussetzungen
+## Warum Gen3?
 
-* **Shelly Pro 2PM** (Firmware ≥ 1.3.0 empfohlen)  
-* **Kanal 0** → misst PV‑Leistung (z. B. über externen Strommesswandler)  
-  **Kanal 1** → schaltet & misst die Poolpumpe  
-* Optional: Taster auf **INPUT 1** für manuelles Übersteuern  
-* WLAN‑Zugang (für Zeitserver & ggf. Google‑Sheets‑Logging)
+* **Integrierte Strommessung**: Kanal 0 misst direkt die PV-Leistung, Kanal 1 die Pumpe – keine externen Klemmen nötig.  
+* **Mehr Rechenleistung & größerer Script-Speicher** – perfekt für die Logik dieses Projekts.
 
 ---
 
-## Schnellstart
+## Funktions-Highlights
 
-1. **Shelly‑Skript importieren**  
-   * In der Web‑UI **Scripts → Create New Script** wählen,  
-     Inhalt aus `shellyscript.js` kopieren.  
-   * In **Zeile 13** die Variable `googleUrl` mit der späteren WebApp‑URL befüllen (oder `""`, falls kein Logging).  
-2. **Parameter anpassen** (siehe Abschnitt *Konfiguration*).  
-3. **Script speichern & starten** → Die Pumpe sollte zunächst *aus* sein; im Log erscheint „Programm neu gestartet“.  
-4. **Google‑Sheet einrichten** (optional)  
-   * Neues Spreadsheet anlegen → **Erweiterungen → Apps Script** → Inhalt aus `appscript.gs` einfügen.  
-   * **Deploy → Web‑App** → *Execute as* **Me**, *Access* **Anyone** → **Deploy**.  
-   * Die Executable‑URL anschließend in `googleUrl` im Shelly‑Skript eintragen.
+| Feature | Was es tut |
+|---------|------------|
+| **PV-abhängiges Schalten** | Start erst nach 5 min PV > Schwellwert (Standard 580 W). |
+| **Frühstart & Hysterese** | Optionaler Early-Start bei Morning-Peak > 400 W, 5-min Ein/Aus-Hysterese vermeidet Taktbetrieb. |
+| **Sunrise/Sunset lokal** | Tagesanfang/-ende wird ausschließlich anhand der gemessenen Wattwerte erkannt – keine Internet-Zeit oder API nötig. |
+| **Max. Laufzeit** | Pumpe läuft höchstens 6 h pro Tag; beim Erreichen wird abgeschaltet. |
+| **Manuelle Übersteuerung** | Taster an **S1** (Input 1) schaltet pumpenseitig dauerhaft ein/aus. |
+| **(Optional) Logging** | Minütliche Summen (PV, Pumpe, Netzbezug, Überschuss) via HTTP-POST an ein Google-Sheet. |
 
 ---
 
-## Konfiguration
+## Hardware-Setup
 
-Alle Schwellwerte befinden sich am Kopf von `shellyscript.js`.
+| Komponente | Anschluss / Hinweis |
+|------------|--------------------|
+| **Shelly 2PM Gen3** | Firmware ≥ 1.3.0 |
+| PV-Wechselrichter­ausgang | Über **Kanal 0** führen (Leitung durch L-Eingang → Strom wird intern gemessen). |
+| Poolpumpe | An **Kanal 1** anschließen – schaltet und misst gleichzeitig. |
+| Optionaler Taster | Zwischen **S1** und GND für manuelles Ein-/Ausschalten. |
+| (Nur bei Logging)** WLAN / Internet** | Für HTTP-POST an Google-App-Script erforderlich. |
 
-| Variable | Vorgabe | Bedeutung |
+> 🔌 **Kein Internet nötig, wenn du nur die Automatik möchtest!**
+
+---
+
+## Installation in 3 Schritten
+
+1. **Skript importieren**  
+   * Shelly-Web-UI → **Scripts → Create New Script** → Inhalt von `shellyscript.js` einfügen.  
+   * In **Zeile 13** gilt:  
+     * `googleUrl = ""` → **ohne** Logging (= komplett offline)  
+     * sonst Exec-URL deines Google-App-Scripts eintragen.
+2. **Parameter anpassen** (siehe Tabelle *Konfiguration*).  
+3. **Script speichern & starten** – fertig. Log meldet „Programm neu gestartet“.
+
+### Google-Logging (optional)
+
+1. Neues Google-Spreadsheet → **Erweiterungen → Apps Script** → `appscript.gs` hinein kopieren.  
+2. **Deploy → Web App**  
+   * *Execute as*: **Me**  
+   * *Access*: **Anyone**  
+   * **Deploy** → Exec-URL in `googleUrl` übernehmen.  
+3. Shelly benötigt jetzt WLAN mit Internet, um Log-Einträge zu senden.
+
+---
+
+## Konfiguration (Ausschnitt aus `shellyscript.js`)
+
+| Variable | Default | Erklärung |
 |----------|---------|-----------|
-| `threshold` | `580` W | PV‑Leistung, ab der (nach 5 min) eingeschaltet wird |
-| `onMorningThreshold` | `400` W | Frühstart‑Schwelle vor Ablauf der Wartezeit |
-| `sunriseThresh` | `1` W | „Es wird hell“, sobald PV 5 min > 1 W |
-| `delayAfterSunrise` | `4 h` | Wartezeit nach Sonnenaufgang, bevor Auto‑Start erlaubt |
-| `runDuration` | `6 h` | Maximale Pumpenlaufzeit pro Kalendertag |
-| `timerSec` | `10` s | Zykluszeit der Hauptlogik (nicht ändern, falls unsicher) |
+| `threshold` | `580` W | PV-Leistung, ab der (5 min) eingeschaltet wird. |
+| `onMorningThreshold` | `400` W | Frühstart-Schwelle vor Ablauf der Wartezeit. |
+| `sunriseThresh` | `1` W | Grenze, ab wann es „hell“ ist. |
+| `delayAfterSunrise` | `4*3600` | Sekunden bis Auto-Start nach Sunrise. |
+| `runDuration` | `6*3600` | Maximale Betriebszeit pro Tag (Sekunden). |
+| `timerSec` | `10` s | Zykluszeit der Hauptschleife. |
 
-Alle Zeiten werden in Sekunden bzw. Watt angegeben; bei Änderungen stets das Skript neu starten.
-
----
-
-## Betriebsablauf (vereinfacht)
-
-```mermaid
-graph TD
-  A[Gerätestart] --> B{PV-Leistung > sunriseThresh<br/>5 min?}
-  B -- nein --> B
-  B -- ja --> C[Sunrise erkannt<br/>Startfenster = +4 h]
-  C --> D{PV > onMorningThreshold<br/>5 min?}
-  D -- ja --> E[Frühstart]
-  D -- nein --> F{Zeit >= Startfenster?}
-  F -- ja --> G[Planmäßiger Start]
-  G --> H{PV <= threshold<br/>5 min ODER<br/>6 h Laufzeit}
-  H -- ja --> I[Ausschalten<br/>runComplete = true]
-  I --> J{Sunset erkannt<br/>(PV < sunriseThresh<br/>30 min)}
-  J -- ja --> K[Tagesstatistik → Google‑Sheet<br/>Zähler zurücksetzen]
-```
+Parameter ändern ⇒ Script neu starten, damit sie aktiv werden.
 
 ---
 
-## Sicherheitshinweise
+## Ablauf in Klartext
 
-* **Netzspannung!** Arbeiten am 230 V‑Netz nur durch Fachpersonal.  
-* Verwende geeignete Schutzschalter (RCD/RCBO) und dimensioniere Verdrahtung & Relais nach Pumpenleistung.  
-* Prüfe, ob deine Pumpe häufiges Ein/Aus verträgt; passe die Hysterese bei Bedarf an.
+1. **Sunrise-Erkennung**  
+   * PV > `sunriseThresh` für 5 min → Tagesstart & Timer-Reset.  
+2. **Startfenster**  
+   * Entweder Frühstart bei dauerhafter Leistung > `onMorningThreshold`  
+   * oder automatischer Start, sobald `delayAfterSunrise` verstrichen ist.  
+3. **Betrieb**  
+   * Läuft, solange PV > `threshold` **und** `runDuration` noch nicht erreicht.  
+4. **Stopp**  
+   * Abschaltung nach 5 min PV ≤ `threshold` **oder** nach Erreichen der Tageslaufzeit.  
+5. **Sunset-Erkennung**  
+   * 30 min PV < `sunriseThresh` markieren Tagende → (optional) Log-Upload, Tages-Zähler zurücksetzen.
 
 ---
 
 ## Fehlersuche
 
-* **Script läuft nicht?** – Web‑UI → *Scripts* → *View Log*.  
-* **Keine Einträge im Google‑Sheet?** – Überprüfe die Exec‑URL und die Berechtigungen der Web‑App.  
-* **Pumpe startet zu spät/früh?** – `threshold`, `onMorningThreshold` oder `delayAfterSunrise` anpassen.
+* **Script läuft nicht?** Web-UI → *Scripts* → *View Log* – hier steht der Grund.  
+* **Keine Log-Einträge?** Prüfe `googleUrl`, Internetverbindung & Zugriffsrechte der Web-App.  
+* **Startet zu spät/früh?** Passe `threshold`, `onMorningThreshold` oder `delayAfterSunrise` an.
 
 ---
 
 ## Contributing
 
-Pull‑Requests (Code‑Cleanup, Funktionen, Bugfixes) und Issues sind willkommen. Bitte vor größeren Änderungen kurz ein Issue aufmachen.
+*Bugfixes, Verbesserungen oder neue Features?* → Fork, Issue aufmachen oder Pull-Request erstellen – herzlich willkommen!
 
 ---
 
 ## Lizenz
 
-Dieses Projekt steht ohne Gewähr unter der **MIT‑Lizenz** (siehe `LICENSE`). Nutzen auf eigene Gefahr – der Autor haftet nicht für mögliche Schäden.
+MIT-Lizenz (siehe `LICENSE`).  
+Nutzung auf eigene Gefahr – keinerlei Haftung für eventuelle Schäden.
 
 ---
 
-☀️ Viel Spaß beim stromsparenden Poolbetrieb!
+☀️ Viel Erfolg beim stromsparenden Poolbetrieb – ganz ohne Cloud!
